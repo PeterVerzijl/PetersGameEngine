@@ -251,3 +251,5 @@ _Pvt_Extensions
 
 # sftp configuration file
 sftp-config.json
+*.sublime-project
+*.sublime-workspace
