@@ -1,4 +1,3 @@
-#if !defined(GAME_H)
 /**************************************************************************** 
 * File:			game.h
 * Version:		0.0.1a
@@ -69,7 +68,7 @@ struct game_offscreen_buffer
 struct game_sound_output_buffer
 {
 	int SamplesPerSecond;
-	int SampleCount;
+	uint32 SampleCount;
 	int16 *Samples;
 };
 
@@ -140,8 +139,8 @@ struct game_clock
 };
 
 // Takes input, bitmap buffer to use, sound buffer to use, timing information
-void GameUpdateAndRender(game_memory *Memory, game_offscreen_buffer *Buffer, 
-						game_sound_output_buffer *SoundBuffer, game_input *Input);
+internal void GameUpdateAndRender(game_memory *Memory, game_offscreen_buffer *Buffer, 
+								game_sound_output_buffer *SoundBuffer, game_input *Input);
 
 struct game_state
 {
@@ -149,6 +148,3 @@ struct game_state
 	int xOffset;
 	int yOffset;
 };
-
-#define GAME_H
-#endif

@@ -138,7 +138,7 @@ internal debug_file_result DEBUGPlatformReadEntireFile(char *FileName)
 				DWORD BytesRead;
 				if (ReadFile(FileHandle,		 
 							Result.Content,			// The pointer of the resulting buffer
-							FileSize.QuadPart,		// The file size
+							FileSize32,				// The file size
 							&BytesRead,				// Amount of bytes read (for file size)
 							0)						// If we want to use overlapped IO 
 					&& (BytesRead == FileSize32))	// Check if we read the whole file!
@@ -460,54 +460,7 @@ LRESULT CALLBACK Win32MainWindowCallback(HWND Window,
 		case WM_KEYDOWN:
 		case WM_KEYUP:
 		{
-			uint32 VKCode = (uint32)wParam;
-			bool WasDown = ((lParam & (1 << 30)) != 0);		// Check if the key came up	
-			bool IsDown = ((lParam & (1 << 31)) == 0);		// Check if the key is up now
-			if (WasDown != IsDown)							// Remove key repeat messages
-			{
-				if (VKCode == 'W')
-				{
-				}
-				else if (VKCode == 'A')
-				{
-				}
-				else if (VKCode == 'S')
-				{
-				}
-				else if (VKCode == 'D')
-				{
-				}
-				else if (VKCode == 'Q')
-				{
-				}
-				else if (VKCode == 'E')
-				{
-				}
-				else if (VKCode == VK_UP)
-				{
-				}
-				else if (VKCode == VK_DOWN)
-				{
-				}
-				else if (VKCode == VK_LEFT)
-				{
-				}
-				else if (VKCode == VK_RIGHT)
-				{
-				}
-				else if (VKCode == VK_ESCAPE)
-				{
-				}
-				else if (VKCode == VK_SPACE)
-				{
-				}
-			}
-			// Force exit alt-F4
-			bool AltKeyWasDown = ((lParam & (1 << 29)) != 0);
-			if (VKCode == VK_F4 && AltKeyWasDown)
-			{
-				Running = false;
-			}
+			Assert(!"Error: Keyboard input trough non-dispatch message!");
 		}break;
 
 
@@ -620,6 +573,13 @@ internal void Win32FillSoundBuffer(win32_sound_output *SoundOutput,
 	}
 }
 
+internal void Win32ProcessKeyboardMessage(game_button_state *NewState,
+											bool32 IsDown)
+{
+	NewState->EndedDown = IsDown;
+	++NewState->HalfTransitionCount;
+}
+
 internal void Win32ProcessXInputDigitalButton(DWORD XInputButtonState, 
 											game_button_state *OldState,
 											game_button_state *NewState,
@@ -694,10 +654,10 @@ int CALLBACK wWinMain(HINSTANCE Instance,
 #endif
 			game_memory GameMemory = {};
 			GameMemory.PermanentStorageSize = Megabytes(64);
-			GameMemory.TransientStorageSize = Gigabytes((uint64)4);
+			GameMemory.TransientStorageSize = Gigabytes((uint64)1);
 			
 			uint64 TotalSize = GameMemory.PermanentStorageSize + GameMemory.TransientStorageSize;
-			GameMemory.PermanentStorage = VirtualAlloc(BaseAddress, TotalSize,
+			GameMemory.PermanentStorage = VirtualAlloc(BaseAddress, (size_t)TotalSize,
 														MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 			GameMemory.TransientStorage = ((uint8 *)GameMemory.PermanentStorage +	// Cast this to uint8 so we advance the pointer in bytes! 
 											GameMemory.PermanentStorageSize);
@@ -719,6 +679,11 @@ int CALLBACK wWinMain(HINSTANCE Instance,
 					
 					// Check if we got a message
 					MSG Message;
+
+					game_controller_input *KeyboardController = &NewInput->Controllers[0];
+					game_controller_input ZeroController = {};
+					*KeyboardController = ZeroController;
+
 					while (PeekMessage(&Message, 		// Pointer to message
 										0, 				// The window handle, 0 get all messages
 										0, 				// Message filter inner bounds
@@ -729,17 +694,92 @@ int CALLBACK wWinMain(HINSTANCE Instance,
 						{
 							Running = false;
 						}
-						TranslateMessage(&Message);	// Takes message and gets ready for keyboard events etc.
-						DispatchMessage(&Message);
+
+						switch(Message.message)
+						{
+							case WM_SYSKEYDOWN:
+							case WM_SYSKEYUP:
+							case WM_KEYDOWN:
+							case WM_KEYUP:
+							{
+								uint32 VKCode = (uint32)Message.wParam;
+								bool WasDown = ((Message.lParam & (1 << 30)) != 0);		// Check if the key came up	
+								bool IsDown = ((Message.lParam & (1 << 31)) == 0);		// Check if the key is up now
+								if (WasDown != IsDown)									// Remove key repeat messages
+								{
+									if (VKCode == 'W')
+									{
+									}
+									else if (VKCode == 'A')
+									{
+									}
+									else if (VKCode == 'S')
+									{
+									}
+									else if (VKCode == 'D')
+									{
+									}
+									else if (VKCode == 'Q')
+									{
+										Win32ProcessKeyboardMessage(&KeyboardController->LeftShoulder,\
+																		IsDown);
+									}
+									else if (VKCode == 'E')
+									{
+										Win32ProcessKeyboardMessage(&KeyboardController->RightShoulder,
+																		IsDown);
+									}
+									else if (VKCode == VK_UP)
+									{
+										Win32ProcessKeyboardMessage(&KeyboardController->Up,
+																		IsDown);
+									}
+									else if (VKCode == VK_DOWN)
+									{
+										Win32ProcessKeyboardMessage(&KeyboardController->Down,
+																		IsDown);
+									}
+									else if (VKCode == VK_LEFT)
+									{
+										Win32ProcessKeyboardMessage(&KeyboardController->Left,
+																		IsDown);
+									}
+									else if (VKCode == VK_RIGHT)
+									{
+										Win32ProcessKeyboardMessage(&KeyboardController->Right,
+																		IsDown);
+									}
+									else if (VKCode == VK_ESCAPE)
+									{
+										Running = false;
+									}
+									else if (VKCode == VK_SPACE)
+									{
+									}
+								}
+								// Force exit alt-F4
+								bool AltKeyWasDown = ((Message.lParam & (1 << 29)) != 0);
+								if (VKCode == VK_F4 && AltKeyWasDown)
+								{
+									Running = false;
+								}
+							}break;
+
+							default:
+							{
+								TranslateMessage(&Message);	// Takes message and gets ready for keyboard events etc.
+								DispatchMessage(&Message);
+							}break;
+						}
 					}
 
 					// TODO(peter) : Poll input more frequently than every frame?
-					int MaxControllerCount = XUSER_MAX_COUNT;
+					DWORD MaxControllerCount = XUSER_MAX_COUNT;
 					if (MaxControllerCount > ArrayCount(NewInput->Controllers))
 					{
 						MaxControllerCount = ArrayCount(NewInput->Controllers);
 					}
-					for (int ControllerIndex = 0; 
+					for (DWORD ControllerIndex = 0; 
 						ControllerIndex < MaxControllerCount; 
 						ControllerIndex++)
 					{
@@ -847,9 +887,9 @@ int CALLBACK wWinMain(HINSTANCE Instance,
 						}
 					}
 
-					DWORD ByteToLock;
+					DWORD ByteToLock = 0;
 					DWORD TargetCursor;
-					DWORD BytesToWrite;
+					DWORD BytesToWrite = 0;
 					DWORD PlayCursor;
 					DWORD WriteCursor;
 					bool32 SoundIsValid = false;
@@ -909,12 +949,12 @@ int CALLBACK wWinMain(HINSTANCE Instance,
 					int64 CyclesElapsed = EndCycleCount - LastCycleCount;
 					int64 CounterElapsed = EndCounter.QuadPart - LastCounter.QuadPart;
 					int32 MSPerFrame = (int32)((1000 * CounterElapsed) / PerfCountFrequency);
-					int32 FPS = PerfCountFrequency / CounterElapsed;
+					int64 FPS = PerfCountFrequency / CounterElapsed;
 					int32 MCPF = (int32)(CyclesElapsed / (1000 * 1000));
 
 #if 0
 					char Buffer[265];
-					wsprintf(Buffer, "%dms/f, %df/s, %dmc/f\n", MSPerFrame, FPS, MCPF);
+					wsprintf(Buffer, "%dms/f, %df/s, %dmc/f\n", MSPerFrame, (int32)FPS, MCPF);
 					OutputDebugStringA(Buffer);
 #endif
 
