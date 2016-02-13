@@ -78,49 +78,55 @@ struct game_button_state
 	bool32 EndedDown;
 };
 
+// TODO(Peter): Change the keyboard input to also act as analogue
+// Or, let the analog act as buttons.
 struct game_controller_input
 {
+	bool32 IsConnected;
 	bool32 IsAnalog;
+	real32 StickAverageX;
+	real32 StickAverageY;
 
-	real32 StartX;
-	real32 StartY;
-
-	real32 MinX;
-	real32 MinY;
-	
-	real32 MaxX;
-	real32 MaxY;
-
-	real32 EndX;
-	real32 EndY;
 	union 
 	{
-		game_button_state Buttons[10];
+		game_button_state Buttons[16];
 		struct 
 		{
-			game_button_state Up;
-			game_button_state Down;
-			game_button_state Left;
-			game_button_state Right;
+			game_button_state StickUp;
+			game_button_state StickDown;
+			game_button_state StickLeft;
+			game_button_state StickRight;
+
+			game_button_state DPadUp;
+			game_button_state DPadDown;
+			game_button_state DPadLeft;
+			game_button_state DPadRight;
 
 			game_button_state LeftShoulder;
 			game_button_state RightShoulder;
+
+			game_button_state Back;
+			game_button_state Start;
 
 			game_button_state AButton;
 			game_button_state BButton;
 			game_button_state XButton;
 			game_button_state YButton;
-
-			game_button_state Start;
-			game_button_state Back;
 		};
 	};
 };
 
 struct game_input
 {
-	game_controller_input Controllers[4];
+	// TODO (Peter) : Add timing here
+	game_controller_input Controllers[5];	// Four controllers and a keyboard on input 0
 };
+inline game_controller_input *GetController(game_input *Input, int ControllerIndex) 
+{
+	Assert(ControllerIndex < ArrayCount(Input->Controllers));
+	game_controller_input *Result = &Input->Controllers[ControllerIndex];
+	return (Result);
+}
 
 struct game_memory
 {
