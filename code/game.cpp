@@ -1,7 +1,7 @@
 /**************************************************************************** 
 * File:			game.cpp
-* Version:		0.0.1a
-* Date:			27-12-2015
+* Version:		
+* Date:			13-02-2016
 * Creator:		Peter Verzijl
 * Description:	Game Layer Main File
 * Notice:		(c) Copyright 2015 by Peter Verzijl. All Rights Reserved.
@@ -91,22 +91,33 @@ internal void GameUpdateAndRender(game_memory *Memory, game_offscreen_buffer *Bu
 	// TODO (peter) : Allow sample offsets for more robust platform options
 	GameOutputSound(SoundBuffer, GameState->ToneHz);
 
-	game_controller_input *Input0 = &Input->Controllers[0];
-	if (Input0->IsAnalog)
+	for (int ControllerIndex = 0; 
+		ControllerIndex < ArrayCount(Input->Controllers); 
+		ControllerIndex++)
 	{
-		GameState->ToneHz = 256 + (int)(128.0f * Input0->EndX);
-		GameState->xOffset += (int)(4.0f * Input0->EndY);
-	}
-	else
-	{
+		game_controller_input *Controller = GetController(Input, ControllerIndex);
+		if (Controller->IsAnalog)
+		{
+			GameState->ToneHz = 256 + (int)(128.0f * Controller->StickAverageX);
+			GameState->xOffset += (int)(4.0f * Controller->StickAverageY);
+		}
+		else
+		{
+			if (Controller->StickLeft.EndedDown)
+			{
+				GameState->xOffset -= 1;
+			} 
+			if (Controller->StickRight.EndedDown) 
+			{
+				GameState->xOffset += 1;
+			}
+		}
 
+		if (Controller->AButton.EndedDown)
+		{
+			GameState->yOffset += 1;
+		}
 	}
-
-	if (Input0->AButton.EndedDown)
-	{
-		GameState->yOffset += 1;
-	}
-
 	/*
 	if (Input0->BButton.EndedDown)
 	{
