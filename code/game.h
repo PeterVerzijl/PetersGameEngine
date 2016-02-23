@@ -145,8 +145,10 @@ struct game_clock
 };
 
 // Takes input, bitmap buffer to use, sound buffer to use, timing information
-internal void GameUpdateAndRender(game_memory *Memory, game_offscreen_buffer *Buffer, 
-								game_sound_output_buffer *SoundBuffer, game_input *Input);
+internal void GameUpdateAndRender(game_memory *Memory, game_offscreen_buffer *Buffer, game_input *Input);
+// NOTE(Peter): This function induces audio latency if it takes longer than 1ms
+// TODO(Peter): Measure the time it takes to do this function.
+internal void GameGetSoundSamples(game_memory *Memory, game_sound_output_buffer *SoundBuffer);
 
 struct game_state
 {

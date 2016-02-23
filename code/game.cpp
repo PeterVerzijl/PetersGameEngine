@@ -63,7 +63,6 @@ internal void RenderAwesomeGradient(game_offscreen_buffer *Buffer,
 } 
 
 internal void GameUpdateAndRender(game_memory *Memory, game_offscreen_buffer *Buffer, 
-								game_sound_output_buffer *SoundBuffer,
 								game_input *Input)
 {
 	Assert(sizeof(game_state) <= Memory->PermanentStorageSize);
@@ -87,9 +86,6 @@ internal void GameUpdateAndRender(game_memory *Memory, game_offscreen_buffer *Bu
 		// TODO (peter) : Maybe let the platform layer decide if the game is initialized successfully.
 		Memory->IsInitialized = true;
 	}
-
-	// TODO (peter) : Allow sample offsets for more robust platform options
-	GameOutputSound(SoundBuffer, GameState->ToneHz);
 
 	for (int ControllerIndex = 0; 
 		ControllerIndex < ArrayCount(Input->Controllers); 
@@ -136,3 +132,10 @@ internal void GameUpdateAndRender(game_memory *Memory, game_offscreen_buffer *Bu
 	*/
 	RenderAwesomeGradient(Buffer, GameState->xOffset, GameState->yOffset);
 }
+
+internal void GameGetSoundSamples(game_memory *Memory, game_sound_output_buffer *SoundBuffer)
+{
+	game_state *GameState = (game_state *)Memory->PermanentStorage;
+	// TODO (peter) : Allow sample offsets for more robust platform options
+	GameOutputSound(SoundBuffer, GameState->ToneHz);
+} 
