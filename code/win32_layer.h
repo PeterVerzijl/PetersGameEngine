@@ -7,7 +7,6 @@
 * Description:	Game Layer Main File
 * Notice:		(c) Copyright 2015 by Peter Verzijl. All Rights Reserved.
 ***************************************************************************/
-
 struct win32_offscreen_buffer
 {
 	BITMAPINFO Info;

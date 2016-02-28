@@ -24,36 +24,15 @@
 	- Keyboard layouts
 */
 
+#include "game.h"
+
 #include <windows.h>
-#include <stdint.h>
 #include <stdio.h>
+#include <malloc.h>
 #include <xinput.h>
 #include <dsound.h>
-#include <math.h>
-
-#define internal static
-#define local_persist static
-#define global_variable static
-
-#define PI32 3.1415926535897932384626433832795028841971693993751058209749445923078164062f
-
-typedef int8_t int8;
-typedef int16_t int16;
-typedef int32_t int32;
-typedef int64_t int64;
-
-typedef uint32_t bool32;
-
-typedef uint8_t uint8;
-typedef uint16_t uint16;
-typedef uint32_t uint32;
-typedef uint64_t uint64;
-
-typedef float real32;
-typedef double real64;
 
 #include "win32_layer.h"
-#include "game.cpp"
 
 // TODO(player) : This should maybe not be global?
 global_variable bool GlobalRunning;
@@ -94,10 +73,20 @@ DIRECT_SOUND_CREATE(DirectSoundCreateStub)
 global_variable direct_sound_create *DirectSoundCreate_ = DirectSoundCreateStub;
 #define DirectSoundCreate DirectSoundCreate_
 
-internal debug_file_result DEBUGPlatformReadEntireFile(char *FileName)
+DEBUG_PLATFORM_FREE_FILE_MEMORY(DEBUGPlatformFreeFileMemory)
+{
+	if (Memory)
+	{
+		VirtualFree(Memory,			// The address of the memory to free
+					0,				// Must be 0 if MEM_RELEASE (releases the whole page)
+					MEM_RELEASE);	// We want to just free it forever
+	}
+}
+
+DEBUG_PLATFORM_READ_ENTIRE_FILE(DEBUGPlatformReadEntireFile)
 {
 	debug_file_result Result = {}  ;
-	HANDLE FileHandle = CreateFileA(FileName,
+	HANDLE FileHandle = CreateFileA(Filename,
 									GENERIC_READ,		// What do we want to do
 									FILE_SHARE_READ,	// What can others do
 									0,					// Security
@@ -150,20 +139,10 @@ internal debug_file_result DEBUGPlatformReadEntireFile(char *FileName)
 	return (Result);
 }
 
-internal void DEBUGPlatformFreeFileMemory(void *Memory)
-{
-	if (Memory)
-	{
-		VirtualFree(Memory,			// The address of the memory to free
-					0,				// Must be 0 if MEM_RELEASE (releases the whole page)
-					MEM_RELEASE);	// We want to just free it forever
-	}
-}
-
-internal bool32 DEBUGPlatformWriteEntireFile(char *FileName, uint32 MemorySize, void *Memory)
+DEBUG_PLATFORM_WRITE_ENTIRE_FILE(DEBUGPlatformWriteEntireFile)
 {
 	bool32 Result = false;;
-	HANDLE FileHandle = CreateFileA(FileName,
+	HANDLE FileHandle = CreateFileA(Filename,
 									GENERIC_WRITE,		// What do we want to do
 									0,					// Lock the file
 									0,					// Security
@@ -196,6 +175,55 @@ internal bool32 DEBUGPlatformWriteEntireFile(char *FileName, uint32 MemorySize, 
 		DWORD error = GetLastError();
 	}
 	return (Result);	
+}
+
+struct win32_game_code 
+{
+	HMODULE GameCodeDLL;
+	game_update_and_render *UpdateAndRender;
+	game_get_sound_samples *GetSoundSamples;
+
+	bool32 IsValid;
+};
+internal win32_game_code Win32LoadGameCode(void)
+{
+	win32_game_code Result = {};
+
+	// TODO(Peter): Get proper path to the game code.
+	// TODO(Peter): Automatically determine the timestamp of the old dll.
+
+	CopyFile("game.dll", "game_temp.dll", FALSE);
+	Result.GameCodeDLL = LoadLibraryA("game_temp.dll");
+	if (Result.GameCodeDLL)
+	{
+		Result.UpdateAndRender = (game_update_and_render *)
+			GetProcAddress(Result.GameCodeDLL, "GameUpdateAndRender");
+		Result.GetSoundSamples = (game_get_sound_samples *)
+			GetProcAddress(Result.GameCodeDLL, "GameGetSoundSamples");
+
+		Result.IsValid = (Result.UpdateAndRender && Result.GetSoundSamples);
+	}
+
+	// Set these to stub functions so nothing fails.
+	if (!Result.IsValid)
+	{
+		Result.UpdateAndRender = GameUpdateAndRenderStub;
+		Result.GetSoundSamples = GameGetSoundSamplesStub;
+	}
+
+	return (Result);
+}
+
+internal void Win32UnloadGameCode(win32_game_code *GameCode) 
+{
+	if (GameCode->GameCodeDLL) 
+	{
+		FreeLibrary(GameCode->GameCodeDLL);
+		GameCode->GameCodeDLL = 0;
+	}
+	GameCode->IsValid = false;
+	GameCode->UpdateAndRender = GameUpdateAndRenderStub;
+	GameCode->GetSoundSamples = GameGetSoundSamplesStub;
 }
 
 internal void Win32LoadXInput(void)
@@ -887,6 +915,10 @@ int CALLBACK wWinMain(HINSTANCE Instance,
 			game_memory GameMemory = {};
 			GameMemory.PermanentStorageSize = Megabytes(64);
 			GameMemory.TransientStorageSize = Gigabytes((uint64)1);
+
+			GameMemory.DEBUGPlatformFreeFileMemory = DEBUGPlatformFreeFileMemory;
+			GameMemory.DEBUGPlatformReadEntireFile = DEBUGPlatformReadEntireFile;
+			GameMemory.DEBUGPlatformWriteEntireFile = DEBUGPlatformWriteEntireFile;
 			
 			uint64 TotalSize = GameMemory.PermanentStorageSize + GameMemory.TransientStorageSize;
 			GameMemory.PermanentStorage = VirtualAlloc(BaseAddress, (size_t)TotalSize,
@@ -912,10 +944,22 @@ int CALLBACK wWinMain(HINSTANCE Instance,
 				int DebugTimeMarkerIndex = 0;
 				win32_debug_time_marker DebugTimeMarkers[GameUpdateHz/2] = {0};
 
+				// Load game code
+				win32_game_code Game = Win32LoadGameCode();
+
 				int64 LastCycleCount = __rdtsc();
+				uint32 LoadCounter = 0;
+
 				// Start of game loop
 				while(GlobalRunning)
 				{
+					if (LoadCounter++ > 60) 
+					{
+						Win32UnloadGameCode(&Game);					
+						Game = Win32LoadGameCode();
+						LoadCounter = 0;
+					}
+
 					// Check if we got a message
 					game_controller_input *OldKeyboardController = GetController(OldInput, 0);
 					game_controller_input *NewKeyboardController = GetController(NewInput, 0);
@@ -1076,7 +1120,7 @@ int CALLBACK wWinMain(HINSTANCE Instance,
 						Buffer.Width = GlobalBackBuffer.Width;
 						Buffer.Height = GlobalBackBuffer.Height;
 						Buffer.Pitch = GlobalBackBuffer.Pitch;
-						GameUpdateAndRender(&GameMemory, &Buffer, NewInput);
+						Game.UpdateAndRender(&GameMemory, &Buffer, NewInput);
 
 						LARGE_INTEGER AudioWallClock = Win32GetWallClock();
 						real32 FlipTillAudioSeconds = 1000.0f * Win32GetSecondsElapsed(FlipWallClock, AudioWallClock);
@@ -1164,7 +1208,7 @@ int CALLBACK wWinMain(HINSTANCE Instance,
 							SoundBuffer.SamplesPerSecond = SoundOutput.SamplesPerSecond;
 							SoundBuffer.SampleCount = BytesToWrite / SoundOutput.BytesPerSample;
 							SoundBuffer.Samples = Samples;
-							GameGetSoundSamples(&GameMemory, &SoundBuffer);
+							Game.GetSoundSamples(&GameMemory, &SoundBuffer);
 
 							Win32FillSoundBuffer(&SoundOutput, ByteToLock, BytesToWrite, &SoundBuffer);
 #if INTERNAL

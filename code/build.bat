@@ -1,7 +1,7 @@
 @echo off
 
-set CommonCompilerFlags=-MT -nologo -Gm- -GR- -EHa- -Oi -WX -W4 -wd4201 -wd4100 -wd4189 -DINTERNAL=1 -DSLOW=1 -FC -Z7 -Fmwin32_layer.map
-set CommonLinkerFlags=-opt:ref User32.lib Gdi32.lib Winmm.lib
+set CommonCompilerFlags=-MT -nologo -Gm- -GR- -EHa- -Oi -WX -W4 -wd4201 -wd4100 -wd4189 -DINTERNAL=1 -DSLOW=1 -FC -Z7
+set CommonLinkerFlags= -incremental:no -opt:ref User32.lib Gdi32.lib Winmm.lib
 
 call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x64
 IF NOT EXIST ..\build mkdir ..\build
@@ -16,6 +16,7 @@ rem 32-bit build
 rem cl %CommonLinkerFlags% ..\code\win32_layer.cpp /link %CommonLinkerFlags% -subsystem:windows,5.1
 
 rem 64-bit build
-cl  %CommonCompilerFlags% ..\code\win32_layer.cpp /link %CommonLinkerFlags%
+cl %CommonCompilerFlags% -Fmgame.map ..\code\game.cpp /LD /link /EXPORT:GameUpdateAndRender /EXPORT:GameGetSoundSamples
+cl %CommonCompilerFlags% -Fmwin32_layer.map ..\code\win32_layer.cpp /link %CommonLinkerFlags%
 
 popd

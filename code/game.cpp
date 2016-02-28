@@ -9,22 +9,25 @@
 
 #include "game.h"
 
-internal void GameOutputSound(game_sound_output_buffer *SoundBuffer, int ToneHz) 
+internal void GameOutputSound(game_sound_output_buffer *SoundBuffer, game_state *GameState) 
 {
-	local_persist real32 tSine;
 	int16 ToneVolume = 3000;
 	int16 *SampleOut = SoundBuffer->Samples;
-	int WavePeriod = SoundBuffer->SamplesPerSecond / ToneHz;
+	int WavePeriod = SoundBuffer->SamplesPerSecond / GameState->ToneHz;
 
 
-	for (DWORD SampleIndex = 0; SampleIndex < SoundBuffer->SampleCount; ++SampleIndex)
+	for (uint32 SampleIndex = 0; SampleIndex < SoundBuffer->SampleCount; ++SampleIndex)
 	{
-		real32 SineValue = sinf(tSine);
+		real32 SineValue = sinf(GameState->tSine);
 		int16 SampleValue = (int16)(SineValue * ToneVolume);
 		*SampleOut++ = SampleValue;
 		*SampleOut++ = SampleValue;
 
-		tSine += 2.0f * PI32 * 1.0f / (real32)(WavePeriod);
+		GameState->tSine += 2.0f * PI32 * 1.0f / (real32)(WavePeriod);
+		if (GameState->tSine > 2.0f * PI32) 
+		{
+			GameState->tSine -= 2.0f*PI32;
+		}
 	}
 }
 
@@ -62,8 +65,7 @@ internal void RenderAwesomeGradient(game_offscreen_buffer *Buffer,
 	}
 } 
 
-internal void GameUpdateAndRender(game_memory *Memory, game_offscreen_buffer *Buffer, 
-								game_input *Input)
+extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
 	Assert(sizeof(game_state) <= Memory->PermanentStorageSize);
 	
@@ -71,17 +73,18 @@ internal void GameUpdateAndRender(game_memory *Memory, game_offscreen_buffer *Bu
 	if (!Memory->IsInitialized)
 	{
 		char *Filename = __FILE__;
-		debug_file_result File = DEBUGPlatformReadEntireFile(Filename);
+		debug_file_result File = Memory->DEBUGPlatformReadEntireFile(Filename);
 		if (File.Content)
 		{
-			DEBUGPlatformWriteEntireFile("test.out", 
+			Memory->DEBUGPlatformWriteEntireFile("test.out", 
 									File.ContentSize, File.Content);
-			DEBUGPlatformFreeFileMemory(File.Content);
+			Memory->DEBUGPlatformFreeFileMemory(File.Content);
 		}
 
  		GameState->ToneHz = 256;
 		GameState->xOffset = 0;
 		GameState->yOffset = 0;
+		GameState->tSine = 0.0f;
 
 		// TODO (peter) : Maybe let the platform layer decide if the game is initialized successfully.
 		Memory->IsInitialized = true;
@@ -133,9 +136,9 @@ internal void GameUpdateAndRender(game_memory *Memory, game_offscreen_buffer *Bu
 	RenderAwesomeGradient(Buffer, GameState->xOffset, GameState->yOffset);
 }
 
-internal void GameGetSoundSamples(game_memory *Memory, game_sound_output_buffer *SoundBuffer)
+extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
 {
 	game_state *GameState = (game_state *)Memory->PermanentStorage;
 	// TODO (peter) : Allow sample offsets for more robust platform options
-	GameOutputSound(SoundBuffer, GameState->ToneHz);
+	GameOutputSound(SoundBuffer, GameState);
 } 
