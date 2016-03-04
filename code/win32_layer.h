@@ -45,5 +45,42 @@ struct win32_debug_time_marker
 	DWORD FlipWriteCursor;
 };
 
+struct win32_game_code 
+{
+	HMODULE GameCodeDLL;
+	FILETIME DLLLastWriteTime;
+	
+	// IMPORTANT(Peter): These must be checked for 0 befor use!
+	game_update_and_render *UpdateAndRender;
+	game_get_sound_samples *GetSoundSamples;
+
+	bool32 IsValid;
+};
+
+struct win32_replay_buffer
+{
+	HANDLE FileHandle;
+	HANDLE MemoryMap;
+	char ReplayFilename[MAX_PATH];
+	void *MemoryBlock;
+};
+
+struct win32_state
+{
+	uint64 TotalSize;
+	void *GameMemoryBlock;
+	win32_replay_buffer ReplayBuffers[4];
+
+	HANDLE RecordingHandle;
+	int  InputRecordingIndex;
+
+	HANDLE PlaybackHandle;
+	int InputPlayingIndex;
+
+
+	char EXEFilename[MAX_PATH];
+	char *OnePastLastEXEFilenameSlash; 	
+}; 
+
 #define WIN32_LAYER_H
 #endif
