@@ -318,3 +318,5 @@ sftp-config.json
 *.sdf
 *.vcxproj
 *.filters
+data/test_background.bmp
+*.symcache
